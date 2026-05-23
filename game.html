@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Motocross Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px;
+        }
+
+        .menu-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .menu-screen.hidden {
+            display: none;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+
+        .menu-title {
+            font-size: 2em;
+            margin: 30px 0;
+            color: #00d4ff;
+        }
+
+        .menu-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .menu-btn {
+            padding: 20px;
+            font-size: 1.2em;
+            border: 2px solid #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+            color: #00d4ff;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .menu-btn:hover {
+            background: rgba(0, 212, 255, 0.3);
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+
+        .menu-btn.selected {
+            background: #00d4ff;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.8);
+        }
+
+        .start-btn {
+            padding: 15px 40px;
+            font-size: 1.5em;
+            background: linear-gradient(135deg, #00d4ff, #0099ff);
+            border: none;
+            color: #000;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 30px;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+        }
+
+        .start-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.8);
+        }
+
+        .start-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #gameContainer {
+            width: 100%;
+            height: 100vh;
+            display: none;
+            position: relative;
+        }
+
+        #gameContainer.active {
+            display: block;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            z-index: 100;
+        }
+
+        .hud-item {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 250px;
+        }
+
+        .hud-label {
+            width: 80px;
+            color: #00d4ff;
+            font-size: 0.9em;
+        }
+
+        .hud-bar {
+            width: 150px;
+            height: 20px;
+            background: rgba(0, 212, 255, 0.2);
+            border: 1px solid #00d4ff;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-left: 10px;
+        }
+
+        .hud-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #0099ff);
+            transition: width 0.1s ease;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 0.9em;
+            z-index: 100;
+            max-width: 300px;
+        }
+
+        .controls h3 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .control-item {
+            margin: 5px 0;
+            color: #aaa;
+            font-size: 0.8em;
+        }
+
+        .control-key {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .bike-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: right;
+            z-index: 100;
+        }
+
+        .bike-name {
+            font-size: 1.5em;
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .track-info {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+
+            .menu-title {
+                font-size: 1.5em;
+            }
+
+            .hud {
+                top: 10px;
+                left: 10px;
+                padding: 15px;
+            }
+
+            .hud-item {
+                width: 200px;
+            }
+
+            .controls {
+                bottom: 10px;
+                left: 10px;
+                font-size: 0.7em;
+            }
+
+            .bike-info {
+                top: 10px;
+                right: 10px;
+                font-size: 0.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Menu Screen -->
+        <div id="menuScreen" class="menu-screen">
+            <h1>🏍️ 3D MOTOCROSS GAME</h1>
+
+            <!-- Bike Selection -->
+            <div id="bikeMenu">
+                <div class="menu-title">Select Your Bike</div>
+                <div class="menu-options">
+                    <button class="menu-btn" data-bike="ktm">
+                        🟠 KTM 450<br><small>High RPM</small>
+                    </button>
+                    <button class="menu-btn" data-bike="yamaha">
+                        🔵 Yamaha YZ<br><small>Balanced</small>
+                    </button>
+                    <button class="menu-btn" data-bike="honda">
+                        🔴 Honda CRF<br><small>Stable</small>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Track Selection -->
+            <div id="trackMenu" style="display: none;">
+                <div class="menu-title">Select Your Track</div>
+                <div class="menu-options">
+                    <button class="menu-btn" data-track="street">
+                        🛣️ Street Track<br><small>Smooth Asphalt</small>
+                    </button>
+                    <button class="menu-btn" data-track="motocross">
+                        🏜️ Motocross<br><small>Jumps & Bumps</small>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Perspective Selection -->
+            <div id="perspectiveMenu" style="display: none;">
+                <div class="menu-title">Select Your View</div>
+                <div class="menu-options">
+                    <button class="menu-btn" data-perspective="1st">
+                        👁️ First Person<br><small>Rider's View</small>
+                    </button>
+                    <button class="menu-btn" data-perspective="3rd">
+                        📷 Third Person<br><small>Follow Camera</small>
+                    </button>
+                </div>
+            </div>
+
+            <button id="startBtn" class="start-btn" disabled>START GAME</button>
+        </div>
+
+        <!-- Game Container -->
+        <div id="gameContainer"></div>
+    </div>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // ============================================
+        // GAME STATE MANAGEMENT
+        // ============================================
+        let gameState = {
+            bike: null,
+            track: null,
+            perspective: null,
+            gameStarted: false
+        };
+
+        // ============================================
+        // BIKE CONFIGURATION
+        // ============================================
+        const BIKES = {
+            ktm: {
+                name: 'KTM 450',
+                color: 0xff6600,
+                mass: 190,
+                maxRpm: 13000,
+                idleRpm: 1000,
+                power: 55
+            },
+            yamaha: {
+                name: 'Yamaha YZ',
+                color: 0x2266ff,
+                mass: 205,
+                maxRpm: 11500,
+                idleRpm: 900,
+                power: 50
+            },
+            honda: {
+                name: 'Honda CRF',
+                color: 0xff2200,
+                mass: 198,
+                maxRpm: 12000,
+                idleRpm: 850,
+                power: 52
+            }
+        };
+
+        // ============================================
+        // MENU SYSTEM
+        // ============================================
+        const menuScreen = document.getElementById('menuScreen');
+        const startBtn = document.getElementById('startBtn');
+
+        // Bike selection
+        document.querySelectorAll('[data-bike]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('[data-bike]').forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                gameState.bike = this.dataset.bike;
+                checkMenuProgress();
+            });
+        });
+
+        // Track selection
+        document.querySelectorAll('[data-track]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('[data-track]').forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                gameState.track = this.dataset.track;
+                showPerspectiveMenu();
+            });
+        });
+
+        // Perspective selection
+        document.querySelectorAll('[data-perspective]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('[data-perspective]').forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                gameState.perspective = this.dataset.perspective === '1st';
+                startBtn.disabled = false;
+            });
+        });
+
+        function checkMenuProgress() {
+            if (gameState.bike) {
+                document.getElementById('bikeMenu').style.display = 'none';
+                document.getElementById('trackMenu').style.display = 'block';
+            }
+        }
+
+        function showPerspectiveMenu() {
+            if (gameState.track) {
+                document.getElementById('trackMenu').style.display = 'none';
+                document.getElementById('perspectiveMenu').style.display = 'block';
+            }
+        }
+
+        startBtn.addEventListener('click', startGame);
+
+        // ============================================
+        // THREE.JS GAME ENGINE
+        // ============================================
+        let scene, camera, renderer, bike, track;
+        const keys = {};
+
+        class MotocrossGame {
+            constructor() {
+                this.setupThreeJS();
+                this.createScene();
+                this.createBike();
+                this.createTrack();
+                this.setupLights();
+                this.setupControls();
+                this.animate();
+            }
+
+            setupThreeJS() {
+                const container = document.getElementById('gameContainer');
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x87ceeb);
+                scene.fog = new THREE.Fog(0x87ceeb, 300, 1000);
+
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+                camera.position.set(0, 2, 5);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+                container.appendChild(renderer.domElement);
+
+                window.addEventListener('resize', () => this.onWindowResize());
+            }
+
+            onWindowResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            createScene() {
+                // Ground
+                const groundGeometry = new THREE.PlaneGeometry(10000, 10000);
+                const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x22aa22 });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                scene.add(ground);
+            }
+
+            createBike() {
+                const bikeConfig = BIKES[gameState.bike];
+                
+                // Bike body
+                const bodyGeometry = new THREE.BoxGeometry(0.4, 0.8, 0.8);
+                const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                    color: bikeConfig.color,
+                    roughness: 0.4,
+                    metalness: 0.6
+                });
+                bike = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                bike.castShadow = true;
+                bike.receiveShadow = true;
+
+                // Wheels
+                const wheelGeometry = new THREE.CylinderGeometry(0.35, 0.35, 0.2, 32);
+                const wheelMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x333333,
+                    roughness: 0.8
+                });
+
+                // Front wheel
+                const frontWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                frontWheel.rotation.z = Math.PI / 2;
+                frontWheel.position.set(0, 0.2, -0.4);
+                frontWheel.castShadow = true;
+                bike.add(frontWheel);
+
+                // Rear wheel
+                const rearWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                rearWheel.rotation.z = Math.PI / 2;
+                rearWheel.position.set(0, 0.2, 0.4);
+                rearWheel.castShadow = true;
+                bike.add(rearWheel);
+
+                bike.position.y = 1;
+                bike.userData = {
+                    velocity: new THREE.Vector3(),
+                    speed: 0,
+                    rpm: 0,
+                    throttle: 0,
+                    clutch: 0,
+                    gear: 1,
+                    maxGears: 6,
+                    config: bikeConfig,
+                    wheelRotation: 0
+                };
+
+                scene.add(bike);
+            }
+
+            createTrack() {
+                const trackType = gameState.track;
+                const segments = trackType === 'street' ? 100 : 80;
+
+                for (let i = 0; i < segments; i++) {
+                    const z = i * 10;
+                    const x = Math.sin(i * (trackType === 'street' ? 0.3 : 0.2)) * (trackType === 'street' ? 10 : 15);
+                    
+                    let height = 0;
+                    if (trackType === 'motocross') {
+                        if (i % 20 === 0) height = 3;
+                        else if (i % 20 === 1) height = -2;
+                        else if (i % 20 === 2) height = 1;
+                        else height = 0.5 * Math.sin(i * 0.5);
+                    }
+
+                    const width = trackType === 'street' ? 4 : 6;
+                    const length = 10;
+
+                    const segmentGeometry = new THREE.BoxGeometry(width, 0.5, length);
+                    const segmentMaterial = new THREE.MeshLambertMaterial({
+                        color: trackType === 'street' ? 0x444444 : 0x996633
+                    });
+                    
+                    const segment = new THREE.Mesh(segmentGeometry, segmentMaterial);
+                    segment.position.set(x, height, z);
+                    segment.receiveShadow = true;
+                    scene.add(segment);
+                }
+            }
+
+            setupLights() {
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                scene.add(ambientLight);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(50, 100, 50);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.camera.left = -200;
+                directionalLight.shadow.camera.right = 200;
+                directionalLight.shadow.camera.top = 200;
+                directionalLight.shadow.camera.bottom = -200;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                scene.add(directionalLight);
+            }
+
+            setupControls() {
+                window.addEventListener('keydown', (e) => {
+                    keys[e.key.toLowerCase()] = true;
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    keys[e.key.toLowerCase()] = false;
+                });
+            }
+
+            updateBike(deltaTime) {
+                const userData = bike.userData;
+
+                // Throttle
+                if (keys['w'] || keys['arrowup']) {
+                    userData.throttle = Math.min(1, userData.throttle + 0.05);
+                } else {
+                    userData.throttle = Math.max(0, userData.throttle - 0.05);
+                }
+
+                // Clutch
+                if (keys['control'] || keys['c']) {
+                    userData.clutch = Math.min(1, userData.clutch + 0.05);
+                } else {
+                    userData.clutch = Math.max(0, userData.clutch - 0.05);
+                }
+
+                // Gear shifts
+                if (keys['e'] && userData.rpm > 8000 && userData.gear < userData.maxGears) {
+                    userData.gear++;
+                    userData.rpm = userData.config.idleRpm;
+                    keys['e'] = false;
+                }
+                if (keys['q'] && userData.gear > 1) {
+                    userData.gear--;
+                    userData.rpm = userData.config.idleRpm;
+                    keys['q'] = false;
+                }
+
+                // Brake
+                let brakeForce = 0;
+                if (keys[' ']) {
+                    brakeForce = 0.95;
+                }
+
+                // Physics simulation
+                const gearRatios = [4.5, 3.5, 2.8, 2.2, 1.8, 1.5];
+                const gearRatio = gearRatios[userData.gear - 1];
+
+                // RPM calculation
+                if (userData.clutch > 0.1) {
+                    userData.rpm = Math.max(userData.config.idleRpm, userData.rpm - 2000 * deltaTime);
+                } else {
+                    const wheelRpm = (userData.speed / (Math.PI * 0.3)) * 60;
+                    userData.rpm = Math.max(userData.config.idleRpm, wheelRpm * gearRatio);
+                    userData.rpm = Math.min(userData.config.maxRpm, userData.rpm);
+                }
+
+                // Throttle affects RPM
+                if (userData.clutch < 0.1) {
+                    userData.rpm = Math.min(userData.config.maxRpm, userData.rpm + userData.throttle * 5000 * deltaTime);
+                } else {
+                    userData.rpm = Math.min(userData.config.maxRpm, userData.rpm + userData.throttle * 3000 * deltaTime);
+                }
+
+                // Power calculation
+                const rpmNorm = userData.rpm / userData.config.maxRpm;
+                let power = userData.config.power * Math.sin(rpmNorm * Math.PI);
+                power = Math.max(0, power);
+
+                // Traction force
+                let tractionForce = 0;
+                if (userData.clutch < 0.1) {
+                    const slip = 1.0 - userData.clutch * 0.2;
+                    tractionForce = power * slip * userData.throttle / Math.max(1, userData.speed + 0.1);
+                }
+
+                // Acceleration
+                const drag = userData.speed * userData.speed * 0.02;
+                const acceleration = (tractionForce - drag) / userData.config.mass;
+
+                // Update speed
+                userData.speed += acceleration * deltaTime;
+                userData.speed = Math.max(0, userData.speed * brakeForce);
+
+                // Update position
+                bike.position.z += userData.speed * deltaTime;
+                bike.position.y = 0.5 + Math.sin(Date.now() * 0.002) * 0.1; // Bobbing
+
+                // Wheel rotation
+                userData.wheelRotation += userData.speed * 0.5;
+                bike.children.forEach(wheel => {
+                    wheel.rotation.x = userData.wheelRotation;
+                });
+
+                // Lean angle
+                bike.rotation.z = userData.speed * 0.001;
+            }
+
+            updateCamera() {
+                const userData = bike.userData;
+
+                if (gameState.perspective) {
+                    // First person
+                    camera.position.x = bike.position.x;
+                    camera.position.y = bike.position.y + 0.5;
+                    camera.position.z = bike.position.z - 0.3;
+                    camera.lookAt(bike.position.x, bike.position.y, bike.position.z + 10);
+                } else {
+                    // Third person
+                    camera.position.x = bike.position.x + Math.sin(bike.rotation.y) * 8;
+                    camera.position.y = bike.position.y + 3;
+                    camera.position.z = bike.position.z - Math.cos(bike.rotation.y) * 8;
+                    camera.lookAt(bike.position.x, bike.position.y, bike.position.z);
+                }
+            }
+
+            updateHUD() {
+                const userData = bike.userData;
+                const rpmPercent = (userData.rpm / userData.config.maxRpm) * 100;
+                const speedKmh = userData.speed * 3.6;
+                const clutchPercent = userData.clutch * 100;
+
+                document.getElementById('rpmFill').style.width = rpmPercent + '%';
+                document.getElementById('speedFill').style.width = Math.min(speedKmh / 2, 100) + '%';
+                document.getElementById('clutchFill').style.width = clutchPercent + '%';
+
+                document.getElementById('rpmValue').textContent = Math.floor(userData.rpm) + ' RPM';
+                document.getElementById('speedValue').textContent = Math.floor(speedKmh) + ' KM/H';
+                document.getElementById('gearValue').textContent = 'Gear: ' + userData.gear;
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                const deltaTime = 1 / 60; // 60 FPS
+
+                this.updateBike(deltaTime);
+                this.updateCamera();
+                this.updateHUD();
+
+                renderer.render(scene, camera);
+            }
+        }
+
+        function startGame() {
+            menuScreen.classList.add('hidden');
+            document.getElementById('gameContainer').classList.add('active');
+
+            // Create HUD
+            const hud = `
+                <div class="hud">
+                    <div class="hud-item">
+                        <span class="hud-label">RPM:</span>
+                        <div class="hud-bar"><div id="rpmFill" class="hud-fill"></div></div>
+                        <span id="rpmValue">0 RPM</span>
+                    </div>
+                    <div class="hud-item">
+                        <span class="hud-label">SPEED:</span>
+                        <div class="hud-bar"><div id="speedFill" class="hud-fill"></div></div>
+                        <span id="speedValue">0 KM/H</span>
+                    </div>
+                    <div class="hud-item">
+                        <span class="hud-label">CLUTCH:</span>
+                        <div class="hud-bar"><div id="clutchFill" class="hud-fill"></div></div>
+                        <span id="gearValue">Gear: 1</span>
+                    </div>
+                </div>
+
+                <div class="bike-info">
+                    <div class="bike-name">${BIKES[gameState.bike].name}</div>
+                    <div class="track-info">${gameState.track === 'street' ? '🛣️ Street Track' : '🏜️ Motocross'}</div>
+                    <div class="track-info">${gameState.perspective ? '👁️ First Person' : '📷 Third Person'}</div>
+                </div>
+
+                <div class="controls">
+                    <h3>Controls</h3>
+                    <div class="control-item"><span class="control-key">W / ↑</span> - Throttle</div>
+                    <div class="control-item"><span class="control-key">CTRL / C</span> - Clutch</div>
+                    <div class="control-item"><span class="control-key">SPACE</span> - Brake</div>
+                    <div class="control-item"><span class="control-key">Q / E</span> - Shift Gears</div>
+                </div>
+            `;
+
+            document.getElementById('gameContainer').innerHTML = hud;
+
+            // Start game
+            new MotocrossGame();
+        }
+    </script>
+</body>
+</html>
