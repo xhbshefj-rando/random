@@ -15,8 +15,13 @@ class TrackType(Enum):
     STREET = 1
     MOTOCROSS = 2
 
+class BikeModel(Enum):
+    KTM = 1
+    YAMAHA = 2
+    HONDA = 3
+
 class BikePhysics:
-    def __init__(self):
+    def __init__(self, bike_model=BikeModel.KTM):
         # Bike state
         self.position = [0, 0, 0]
         self.rotation = [0, 0, 0]
@@ -31,10 +36,9 @@ class BikePhysics:
         self.gear = 1
         self.max_gears = 6
         
-        # Engine properties
-        self.max_rpm = 12000
-        self.idle_rpm = 800
-        self.power_curve = self._create_power_curve()
+        # Bike model configuration
+        self.bike_model = bike_model
+        self._configure_bike_model()
         
         # Physical properties
         self.mass = 200  # kg
@@ -48,17 +52,42 @@ class BikePhysics:
         self.suspension_rest = 0
         self.suspension_spring = 0.5
         self.suspension_damping = 0.3
+    
+    def _configure_bike_model(self):
+        """Configure bike properties based on model"""
+        if self.bike_model == BikeModel.KTM:
+            self.max_rpm = 13000
+            self.idle_rpm = 1000
+            self.mass = 190
+            self.bike_color = (1.0, 0.4, 0.0)  # Orange
+            self.bike_name = "KTM 450"
+        elif self.bike_model == BikeModel.YAMAHA:
+            self.max_rpm = 11500
+            self.idle_rpm = 900
+            self.mass = 205
+            self.bike_color = (0.2, 0.4, 0.8)  # Blue
+            self.bike_name = "Yamaha YZ"
+        else:  # HONDA
+            self.max_rpm = 12000
+            self.idle_rpm = 850
+            self.mass = 198
+            self.bike_color = (1.0, 0.2, 0.0)  # Red
+            self.bike_name = "Honda CRF"
         
+        self.power_curve = self._create_power_curve()
+    
     def _create_power_curve(self):
-        """Create a realistic power delivery curve"""
+        """Create a realistic power delivery curve based on bike model"""
         curve = {}
-        for rpm in range(0, 13000, 500):
-            if rpm < 2000:
-                power = (rpm / 2000) * 50
-            elif rpm < 8000:
-                power = 50 + (rpm - 2000) / 6000 * 150
+        max_power = 50 if self.bike_model == BikeModel.YAMAHA else 55
+        
+        for rpm in range(0, self.max_rpm + 500, 500):
+            if rpm < self.idle_rpm * 2:
+                power = (rpm / (self.idle_rpm * 2)) * max_power * 0.6
+            elif rpm < self.max_rpm * 0.65:
+                power = max_power * 0.6 + (rpm - self.idle_rpm * 2) / (self.max_rpm * 0.65 - self.idle_rpm * 2) * (max_power - max_power * 0.6)
             else:
-                power = 200 - (rpm - 8000) / 4000 * 100
+                power = max_power - (rpm - self.max_rpm * 0.65) / (self.max_rpm - self.max_rpm * 0.65) * max_power * 0.3
             curve[rpm] = max(0, power)
         return curve
     
@@ -189,10 +218,10 @@ class Track:
 
 
 class MotocrossGame:
-    def __init__(self, track_type):
+    def __init__(self, track_type, bike_model=BikeModel.KTM, first_person=True):
         pygame.init()
         pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), DOUBLEBUF | OPENGL)
-        pygame.display.set_caption("3D Motocross Game")
+        pygame.display.set_caption(f"3D Motocross Game - {bike_model.name}")
         
         # Setup OpenGL
         glEnable(GL_DEPTH_TEST)
@@ -211,10 +240,18 @@ class MotocrossGame:
         glLight(GL_LIGHT0, GL_DIFFUSE, [1, 1, 1, 1])
         
         self.clock = pygame.time.Clock()
-        self.bike = BikePhysics()
+        self.bike = BikePhysics(bike_model)
         self.track = Track(track_type)
         self.track_type = track_type
         self.running = True
+        self.first_person = first_person
+        
+        # First person camera settings
+        self.camera_offset_x = 0.0
+        self.camera_offset_y = 0.5  # Eye height
+        self.camera_offset_z = -0.3  # Forward position
+        
+        # Third person camera settings
         self.camera_distance = 5
         self.camera_height = 2
         
@@ -247,6 +284,10 @@ class MotocrossGame:
         # Brakes
         if keys[K_SPACE]:
             self.bike.acceleration -= 15
+        
+        # Toggle perspective
+        if keys[K_p]:
+            self.first_person = not self.first_person
         
         # Check for quit
         for event in pygame.event.get():
@@ -293,7 +334,8 @@ class MotocrossGame:
         glRotatef(self.bike.rotation[1] * 180 / math.pi, 0, 1, 0)
         glRotatef(self.bike.rotation[2] * 180 / math.pi, 0, 0, 1)
         
-        glColor3f(1, 0, 0)  # Red bike
+        # Bike color based on model
+        glColor3f(*self.bike.bike_color)
         
         # Main body
         self._draw_box(0.4, 0.8, 0.8)
@@ -363,13 +405,15 @@ class MotocrossGame:
         rpm_ratio = self.bike.rpm / self.bike.max_rpm
         self._draw_rect(10, 10, 200 * rpm_ratio, 20)
         
-        # Speed
-        speed_kmh = self.bike.speed * 3.6
-        
         # Clutch indicator
         clutch_ratio = self.bike.clutch
         glColor3f(1, 1, 0)
         self._draw_rect(10, 40, 200 * clutch_ratio, 20)
+        
+        # Speed indicator
+        glColor3f(0, 1, 1)
+        speed_ratio = min(self.bike.speed / 50, 1.0)
+        self._draw_rect(10, 70, 200 * speed_ratio, 20)
         
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_LIGHTING)
@@ -393,19 +437,36 @@ class MotocrossGame:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         
-        # Position camera behind and above the bike
-        cam_x = self.bike.position[0] - math.sin(self.bike.rotation[1]) * self.camera_distance
-        cam_y = self.bike.position[1] + self.camera_height
-        cam_z = self.bike.position[2] - math.cos(self.bike.rotation[1]) * self.camera_distance
-        
-        gluLookAt(cam_x, cam_y, cam_z,
-                  self.bike.position[0], self.bike.position[1], self.bike.position[2],
-                  0, 1, 0)
+        if self.first_person:
+            # First-person view
+            cam_x = self.bike.position[0] + self.camera_offset_x
+            cam_y = self.bike.position[1] + self.camera_offset_y
+            cam_z = self.bike.position[2] + self.camera_offset_z
+            
+            # Look forward
+            look_x = self.bike.position[0]
+            look_y = self.bike.position[1]
+            look_z = self.bike.position[2] + 5
+            
+            gluLookAt(cam_x, cam_y, cam_z,
+                      look_x, look_y, look_z,
+                      0, 1, 0)
+        else:
+            # Third-person view
+            cam_x = self.bike.position[0] - math.sin(self.bike.rotation[1]) * self.camera_distance
+            cam_y = self.bike.position[1] + self.camera_height
+            cam_z = self.bike.position[2] - math.cos(self.bike.rotation[1]) * self.camera_distance
+            
+            gluLookAt(cam_x, cam_y, cam_z,
+                      self.bike.position[0], self.bike.position[1], self.bike.position[2],
+                      0, 1, 0)
         
         # Draw scene
         self.draw_track()
-        self.draw_bike()
+        if not self.first_person:
+            self.draw_bike()
         
+        self.draw_hud()
         pygame.display.flip()
     
     def run(self):
@@ -413,12 +474,14 @@ class MotocrossGame:
         print("=" * 50)
         print("3D MOTOCROSS GAME")
         print("=" * 50)
+        print(f"Bike: {self.bike.bike_name}")
         print(f"Track Type: {self.track_type.name}")
         print("\nCONTROLS:")
         print("  UP/W          - Throttle")
         print("  CTRL/C        - Clutch (hold for smooth starts)")
         print("  SPACE         - Brake")
         print("  Q/E           - Down/Up Gear")
+        print("  P             - Toggle Perspective (1st/3rd person)")
         print("  ESC           - Quit")
         print("\nTIPS:")
         print("  - Use clutch to prevent stalling at low RPM")
@@ -433,7 +496,29 @@ class MotocrossGame:
         pygame.quit()
 
 
-def show_menu():
+def show_bike_menu():
+    """Show bike selection menu"""
+    print("\n" + "=" * 50)
+    print("BIKE SELECTION")
+    print("=" * 50)
+    print("1. KTM 450 - High RPM, lightweight")
+    print("2. YAMAHA YZ - Balanced performance")
+    print("3. HONDA CRF - Stable, reliable")
+    print("=" * 50)
+    
+    while True:
+        choice = input("Select bike (1, 2, or 3): ").strip()
+        if choice == "1":
+            return BikeModel.KTM
+        elif choice == "2":
+            return BikeModel.YAMAHA
+        elif choice == "3":
+            return BikeModel.HONDA
+        else:
+            print("Invalid choice. Please enter 1, 2, or 3.")
+
+
+def show_track_menu():
     """Show track selection menu"""
     print("\n" + "=" * 50)
     print("TRACK SELECTION")
@@ -452,7 +537,28 @@ def show_menu():
             print("Invalid choice. Please enter 1 or 2.")
 
 
+def show_perspective_menu():
+    """Show perspective selection menu"""
+    print("\n" + "=" * 50)
+    print("PERSPECTIVE SELECTION")
+    print("=" * 50)
+    print("1. FIRST PERSON - Rider's view")
+    print("2. THIRD PERSON - Follow cam")
+    print("=" * 50)
+    
+    while True:
+        choice = input("Select perspective (1 or 2): ").strip()
+        if choice == "1":
+            return True
+        elif choice == "2":
+            return False
+        else:
+            print("Invalid choice. Please enter 1 or 2.")
+
+
 if __name__ == "__main__":
-    track_type = show_menu()
-    game = MotocrossGame(track_type)
+    bike_model = show_bike_menu()
+    track_type = show_track_menu()
+    first_person = show_perspective_menu()
+    game = MotocrossGame(track_type, bike_model, first_person)
     game.run()
